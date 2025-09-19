@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 interface Env {
-  // Environment bindings will go here if needed
+  MCP_OBJECT: DurableObjectNamespace;
 }
 
 const OSRS_WIKI_API_URL = "https://oldschool.runescape.wiki/api.php";
@@ -166,12 +166,14 @@ export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/sse" || url.pathname === "/sse/message") {
-      return OSRSWikiMCP.serveSSE("/sse").fetch(request, env, ctx);
+    if (url.pathname.startsWith("/sse")) {
+      const handler = OSRSWikiMCP.serveSSE("/sse", { binding: "MCP_OBJECT" });
+      return handler.fetch(request, env, ctx);
     }
 
     if (url.pathname === "/mcp") {
-      return OSRSWikiMCP.serve("/mcp").fetch(request, env, ctx);
+      const handler = OSRSWikiMCP.serve("/mcp", { binding: "MCP_OBJECT" });
+      return handler.fetch(request, env, ctx);
     }
 
     return new Response("Not found", { status: 404 });
