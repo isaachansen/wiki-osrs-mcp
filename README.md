@@ -1,50 +1,39 @@
-# Building a Remote MCP Server on Cloudflare (Without Auth)
 
-This example allows you to deploy a remote MCP server that doesn't require authentication on Cloudflare Workers. 
+# OSRS Wiki MCP Server
 
-## Get started: 
+This project is an MCP (Model Context Protocol) server for Old School RuneScape, providing tools to interact with the OSRS Wiki and RuneLite player data. It is designed to run on Cloudflare Workers and can be connected to LLM clients like Claude Desktop or the Cloudflare AI Playground.
 
-[![Deploy to Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-authless)
+## Features
 
-This will deploy your MCP server to a URL like: `remote-mcp-server-authless.<your-account>.workers.dev/sse`
+- **Wiki Search**: Search the Old School RuneScape Wiki for articles and information.
+- **Page Summarize**: Get readable summaries of any OSRS Wiki page.
+- **Player Data**: Fetch RuneLite player data via the WikiSync plugin (RuneLite client required). Data is cached for one hour and can be refreshed on demand.
+  - If no player data is found, users are prompted to check their username and install the WikiSync plugin.
+- **Personalized Results**: Search and summarize tools can use player data to curate results if a username is provided.
 
-Alternatively, you can use the command line below to get the remote MCP Server created on your local machine:
-```bash
-npm create cloudflare@latest -- my-mcp-server --template=cloudflare/ai/demos/remote-mcp-authless
-```
+## Usage
 
-## Customizing your MCP Server
+Deploy this MCP server to Cloudflare Workers, then connect from your preferred MCP client:
 
-To add your own [tools](https://developers.cloudflare.com/agents/model-context-protocol/tools/) to the MCP server, define each tool inside the `init()` method of `src/index.ts` using `this.server.tool(...)`. 
-
-## Connect to Cloudflare AI Playground
-
-You can connect to your MCP server from the Cloudflare AI Playground, which is a remote MCP client:
-
+### Cloudflare AI Playground
 1. Go to https://playground.ai.cloudflare.com/
-2. Enter your deployed MCP server URL (`remote-mcp-server-authless.<your-account>.workers.dev/sse`)
-3. You can now use your MCP tools directly from the playground!
+2. Enter your deployed MCP server URL (e.g. `osrs-wiki-mcp.<your-account>.workers.dev/sse`)
+3. Use the tools directly from the playground.
 
-## Connect Claude Desktop to your MCP server
+### Claude Desktop
+1. Install [mcp-remote](https://www.npmjs.com/package/mcp-remote) and follow [Anthropic's Quickstart](https://modelcontextprotocol.io/quickstart/user).
+2. In Claude Desktop, go to Settings > Developer > Edit Config and add your MCP server URL.
+3. Restart Claude to see the tools become available.
 
-You can also connect to your remote MCP server from local MCP clients, by using the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote). 
+## Customization
 
-To connect to your MCP server from Claude Desktop, follow [Anthropic's Quickstart](https://modelcontextprotocol.io/quickstart/user) and within Claude Desktop go to Settings > Developer > Edit Config.
+Add or modify tools in `src/index.ts` using the MCP SDK. See the `init()` method for examples.
 
-Update with this configuration:
+## Requirements
+- Cloudflare Workers account
+- Node.js and npm for local development
+- RuneLite client with WikiSync plugin for player data features
 
-```json
-{
-  "mcpServers": {
+## License
+MIT
     "calculator": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "http://localhost:8787/sse"  // or remote-mcp-server-authless.your-account.workers.dev/sse
-      ]
-    }
-  }
-}
-```
-
-Restart Claude and you should see the tools become available. 
