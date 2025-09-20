@@ -121,10 +121,42 @@ async function getSummary(title: string): Promise<string> {
 
 // Define our OSRS Wiki MCP agent with tools
 export class OSRSWikiMCP extends McpAgent {
+
   server = new McpServer({
     name: "osrs-wiki-mcp",
     version: "2.0.0",
   });
+
+  // Player data cache: { username: { data, fetchedAt } }
+  playerDataCache: Record<string, { data: any; fetchedAt: number }> = {};
+
+  // Helper to fetch player data from WikiSync API
+  async fetchPlayerData(username: string, forceRefresh = false): Promise<{ data: any; message?: string }> {
+    const now = Date.now();
+    const cache = this.playerDataCache[username];
+    if (cache && !forceRefresh && now - cache.fetchedAt < 3600_000) {
+      return { data: cache.data };
+    }
+    const url = `https://sync.runescape.wiki/runelite/player/${encodeURIComponent(username)}/STANDARD`;
+    try {
+      const resp = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+      if (!resp.ok) {
+        return { data: null, message: `❌ API Error: ${resp.status}` };
+      }
+      const data = await resp.json();
+      if (!data || Object.keys(data).length === 0) {
+        return {
+          data: null,
+          message:
+            "No player data found. Please ensure that the username is correct. If you are using RuneLite, please install the WikiSync plugin and ensure you are using the RuneLite client. This feature is only available for RuneLite users.",
+        };
+      }
+      this.playerDataCache[username] = { data, fetchedAt: now };
+      return { data };
+    } catch (err) {
+      return { data: null, message: `❌ Error: ${err instanceof Error ? err.message : "Unknown error"}` };
+    }
+  }
 
   async init() {
     // Search OSRS Wiki tool
@@ -137,8 +169,15 @@ export class OSRSWikiMCP extends McpAgent {
           .optional()
           .default(10)
           .describe("Number of results to return (1-50)"),
+        username: z.string().optional().describe("RuneLite username for personalized results"),
       },
-      async ({ query, limit = 10 }) => {
+      async ({ query, limit = 10, username }) => {
+        let playerData;
+        if (username) {
+          const { data } = await this.fetchPlayerData(username);
+          playerData = data;
+        }
+        // TODO: Use playerData to curate results if available
         const result = await searchWiki(query, limit);
         return {
           content: [{ type: "text", text: result }],
@@ -151,11 +190,49 @@ export class OSRSWikiMCP extends McpAgent {
       "summary",
       {
         title: z.string().describe("Page title"),
+        username: z.string().optional().describe("RuneLite username for personalized summary"),
       },
-      async ({ title }) => {
+      async ({ title, username }) => {
+        let playerData;
+        if (username) {
+          const { data } = await this.fetchPlayerData(username);
+          playerData = data;
+        }
+        // TODO: Use playerData to curate summary if available
         const result = await getSummary(title);
         return {
           content: [{ type: "text", text: result }],
+        };
+      }
+    );
+
+    // Get player data tool
+    this.server.tool(
+      "getPlayerData",
+      {
+        username: z.string().optional().describe("RuneLite username to fetch player data for"),
+        forceRefresh: z.boolean().optional().default(false).describe("Force refresh player data from WikiSync API"),
+      },
+      async ({ username, forceRefresh }) => {
+        if (!username || !username.trim()) {
+          return {
+            content: [{ type: "text", text: "Please provide your RuneLite username to fetch player data." }],
+          };
+        }
+        const { data, message } = await this.fetchPlayerData(username, forceRefresh);
+        if (!data) {
+          return {
+            content: [{ type: "text", text: message || "No player data found." }],
+          };
+        }
+        // Format player data as text for MCP compatibility
+        const formatted =
+          "Player data fetched from WikiSync. This feature is only available for RuneLite client users.\n\n" +
+          JSON.stringify(data, null, 2);
+        return {
+          content: [
+            { type: "text", text: formatted },
+          ],
         };
       }
     );
